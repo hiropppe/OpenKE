@@ -31,12 +31,20 @@ void importTrainFiles() {
 	printf("The total of relations is %ld.\n", relationTotal);
 	fclose(fin);
 
-	fin = fopen((inPath + "entity2id.txt").c_str(), "r");
+	if (trainSubset == "") {
+		fin = fopen((inPath + "entity2id.txt").c_str(), "r");
+	} else {
+		fin = fopen((inPath + trainSubset + "/entity2id.txt").c_str(), "r");
+	}
 	tmp = fscanf(fin, "%ld", &entityTotal);
 	printf("The total of entities is %ld.\n", entityTotal);
 	fclose(fin);
 
-	fin = fopen((inPath + "train2id.txt").c_str(), "r");
+	if (trainSubset == "") {
+		fin = fopen((inPath + "train2id.txt").c_str(), "r");
+	} else {
+		fin = fopen((inPath + trainSubset + "/train2id.txt").c_str(), "r");
+	}
 	tmp = fscanf(fin, "%ld", &trainTotal);
 	trainList = (Triple *)calloc(trainTotal, sizeof(Triple));
 	trainHead = (Triple *)calloc(trainTotal, sizeof(Triple));

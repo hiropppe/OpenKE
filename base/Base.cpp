@@ -45,6 +45,9 @@ void randReset();
 extern "C"
 void importTrainFiles();
 
+extern "C"
+void setTrainSubset(char *path);
+
 struct Parameter {
 	INT id;
 	INT *batch_h;

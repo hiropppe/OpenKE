@@ -6,6 +6,7 @@ import time
 import datetime
 import ctypes
 import json
+import h5py as h5
 
 class Config(object):
 
@@ -43,10 +44,26 @@ class Config(object):
 		self.optimizer = None
 		self.test_link_prediction = False
 		self.test_triple_classification = False
+		self.early_stopping_rounds = None
+		self.train_subset = None
 	def init(self):
 		self.trainModel = None
 		if self.in_path != None:
 			self.lib.setInPath(ctypes.create_string_buffer(self.in_path, len(self.in_path) * 2))
+			if self.train_subset:
+				self.lib.setTrainSubset(ctypes.create_string_buffer(self.train_subset, len(self.train_subset) * 2))
+				self.local_entities = list()
+				self.entity2id = dict()
+				with open(os.path.join(self.in_path, self.train_subset, 'entity2id.txt')) as entity2id:
+					entity2id.next()
+					for l in entity2id:
+						e, _ = l.split()
+						self.local_entities.append(e)
+				with open(os.path.join(self.in_path, 'entity2id.txt')) as entity2id:
+					entity2id.next()
+					for l in entity2id:
+						e, n = l.split()
+						self.entity2id[e] = int(n)
 			self.lib.setBern(self.bern)
 			self.lib.setWorkThreads(self.workThreads)
 			self.lib.randReset()
@@ -179,6 +196,12 @@ class Config(object):
 	def set_export_steps(self, steps):
 		self.export_steps = steps
 
+	def set_early_stopping_rounds(self, rounds):
+		self.early_stopping_rounds = rounds
+
+	def set_train_subset(self, subset):
+		self.train_subset = subset;
+
 	def sampling(self):
 		self.lib.sampling(self.batch_h_addr, self.batch_t_addr, self.batch_r_addr, self.batch_y_addr, self.batch_size, self.negative_ent, self.negative_rel)
 
@@ -237,6 +260,28 @@ class Config(object):
 		f.write(json.dumps(self.get_parameters("list")))
 		f.close()
 
+	def save_embeddings(self):
+		print("Saving parameters to h5 store ...")
+		# .json to .h5
+		with h5.File(self.out_path[:-4] + 'h5', 'a') as store:
+		    with self.graph.as_default():
+			with self.sess.as_default():
+			    for var_name in self.get_parameter_lists():
+				if var_name[:3] == 'rel':
+				    if var_name in store:
+					store.pop(var_name)
+				    embeddings = self.get_parameters_by_name(var_name)
+				    store.create_dataset(var_name, data=embeddings)
+				else:
+				    if var_name not in store:
+					embeddings = np.zeros((len(self.entity2id), self.ent_size), dtype=np.float32)
+					store.create_dataset(var_name, data=embeddings)
+
+				    params = self.get_parameters_by_name(var_name)
+				    for i, param in enumerate(params):
+					global_id = self.entity2id[self.local_entities[i]]
+					store[var_name][global_id] = param
+
 	def set_parameters_by_name(self, var_name, tensor):
 		with self.graph.as_default():
 			with self.sess.as_default():
@@ -271,6 +316,34 @@ class Config(object):
 				self.saver = tf.train.Saver()
 				self.sess.run(tf.initialize_all_variables())
 
+	def load_parameters(self, embeddings_path=None):
+	    if embeddings_path is None:
+		if self.out_path is None or os.path.exists(self.out_path[:-4] + 'h5') is False:
+		    return
+		else:
+		    embeddings_path = self.out_path[:-4] + 'h5'
+
+	    print("Loading parameters from h5 store ...")
+	    with h5.File(embeddings_path, 'r') as store:
+		with self.graph.as_default():
+		    with self.sess.as_default():
+			for var_name in self.trainModel.parameter_lists:
+			    tensor = store[var_name].value
+			    var = self.trainModel.parameter_lists[var_name]
+			    if var_name[:3] == 'ent':
+				if self.train_subset:
+				    update_indices = []
+				    updates = np.empty((self.entTotal, self.ent_size))
+				    for n in xrange(self.entTotal):
+					global_id = self.entity2id[self.local_entities[n]]
+					update_indices.append(n)
+					updates[n] = tensor[global_id]
+				    tf.scatter_update(var, update_indices, updates).eval()
+				else:
+				    var.assign(tensor).eval()
+			    else:
+				var.assign(tensor).eval()
+
 	def train_step(self, batch_h, batch_t, batch_r, batch_y):
 		feed_dict = {
 			self.trainModel.batch_h: batch_h,
@@ -291,6 +364,8 @@ class Config(object):
 		return predict
 
 	def run(self):
+		best_loss = None
+		stopping_step = 0
 		with self.graph.as_default():
 			with self.sess.as_default():
 				if self.importName != None:
@@ -305,10 +380,20 @@ class Config(object):
 						print res
 					if self.exportName != None and (self.export_steps!=0 and times % self.export_steps == 0):
 						self.save_tensorflow()
+					if self.early_stopping_rounds:
+						if best_loss is None or res < best_loss:
+							best_loss = res
+							stopping_step = 0
+						else:
+							stopping_step += 1
+						if stopping_step >= self.early_stopping_rounds:
+							break
 				if self.exportName != None:
 					self.save_tensorflow()
 				if self.out_path != None:
 					self.save_parameters(self.out_path)
+					if self.train_subset:
+						self.save_embeddings()
 
 	def test(self):
 		with self.graph.as_default():
@@ -341,3 +426,21 @@ class Config(object):
 					self.lib.test_triple_classification(res_pos.__array_interface__['data'][0], res_neg.__array_interface__['data'][0])
 
 
+	def predict(self, h, t, r, n=10):
+		if h is None:
+		    for i in xrange(self.entTotal):
+			self.test_h[i] = i
+		else:
+		    self.test_h[:] = h
+		if t is None:
+		    for i in xrange(self.entTotal):
+			self.test_t[i] = i
+		else:
+		    self.test_t[:] = t
+		self.test_r[:] = r
+		scores = self.test_step(self.test_h, self.test_t, self.test_r)
+		top_n = np.argpartition(scores, n)[:n]
+		sorted_top_n = top_n[scores[top_n].argsort()]
+		top_n_score = scores[sorted_top_n]
+		for i in range(sorted_top_n.shape[0]):
+		    print sorted_top_n[i], top_n_score[i]

@@ -8,6 +8,7 @@
 
 std::string inPath = "../data/FB15K/";
 std::string outPath = "../data/FB15K/";
+std::string trainSubset = "";
 
 extern "C"
 void setInPath(char *path) {
@@ -25,6 +26,15 @@ void setOutPath(char *path) {
 	for (INT i = 0; i < len; i++)
 		outPath = outPath + path[i];
 	printf("Output Files Path : %s\n", outPath.c_str());
+}
+
+extern "C"
+void setTrainSubset(char *name) {
+	INT len = strlen(name);
+	trainSubset = "";
+	for (INT i = 0; i < len; i++)
+		trainSubset = trainSubset + name[i];
+	printf("Train Subset Name : %s\n", trainSubset.c_str());
 }
 
 /*
