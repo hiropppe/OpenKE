@@ -25,8 +25,8 @@ def train(args):
     con.set_export_files(os.path.join(args.out_path, "model.vec.tf"), 0)
     con.set_out_files(os.path.join(args.out_path, "embedding.vec.json"))
 
-    for i in range(10):
-        for j in range(5):
+    for i in range(1):
+        for j in range(args.subset):
             con.set_train_subset("train" + str(j))
             con.init()
             con.set_model(models.TransE)
@@ -43,6 +43,9 @@ def main(cmd_line_args=None):
     parser.add_argument(
         '--out_path', '-o', type=str, default='./res/', required=True,
         help='Path to directory where export model and parameters.')
+    parser.add_argument(
+        '--subset', '-s', type=int, default=None, required=True,
+        help='Number of sub dataset.')
 
     if cmd_line_args is None:
         args = parser.parse_args()
