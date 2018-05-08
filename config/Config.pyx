@@ -1,4 +1,8 @@
 #coding:utf-8
+# cython: boundscheck = False
+# cython: wraparound = False
+# cython: cdivision = True
+
 import numpy as np
 import tensorflow as tf
 import os
@@ -7,6 +11,11 @@ import datetime
 import ctypes
 import json
 import h5py as h5
+
+cimport numpy as np
+
+from libc.stdio cimport printf
+
 
 class Config(object):
 
@@ -264,23 +273,23 @@ class Config(object):
 		print("Saving parameters to h5 store ...")
 		# .json to .h5
 		with h5.File(self.out_path[:-4] + 'h5', 'a') as store:
-		    with self.graph.as_default():
-			with self.sess.as_default():
-			    for var_name in self.get_parameter_lists():
-				if var_name[:3] == 'rel':
-				    if var_name in store:
-					store.pop(var_name)
-				    embeddings = self.get_parameters_by_name(var_name)
-				    store.create_dataset(var_name, data=embeddings)
-				else:
-				    if var_name not in store:
-					embeddings = np.zeros((len(self.entity2id), self.ent_size), dtype=np.float32)
-					store.create_dataset(var_name, data=embeddings)
+			with self.graph.as_default():
+				with self.sess.as_default():
+					for var_name in self.get_parameter_lists():
+						if var_name[:3] == 'rel':
+							if var_name in store:
+								store.pop(var_name)
+							embeddings = self.get_parameters_by_name(var_name)
+							store.create_dataset(var_name, data=embeddings)
+						else:
+							if var_name not in store:
+								embeddings = np.zeros((len(self.entity2id), self.ent_size), dtype=np.float32)
+								store.create_dataset(var_name, data=embeddings)
 
-				    params = self.get_parameters_by_name(var_name)
-				    for i, param in enumerate(params):
-					global_id = self.entity2id[self.local_entities[i]]
-					store[var_name][global_id] = param
+						params = self.get_parameters_by_name(var_name)
+						for i, param in enumerate(params):
+							global_id = self.entity2id[self.local_entities[i]]
+							store[var_name][global_id] = param
 
 	def set_parameters_by_name(self, var_name, tensor):
 		with self.graph.as_default():
@@ -317,32 +326,32 @@ class Config(object):
 				self.sess.run(tf.initialize_all_variables())
 
 	def load_parameters(self, embeddings_path=None):
-	    if embeddings_path is None:
-		if self.out_path is None or os.path.exists(self.out_path[:-4] + 'h5') is False:
-		    return
-		else:
-		    embeddings_path = self.out_path[:-4] + 'h5'
+		if embeddings_path is None:
+			if self.out_path is None or os.path.exists(self.out_path[:-4] + 'h5') is False:
+				return
+			else:
+				embeddings_path = self.out_path[:-4] + 'h5'
 
-	    print("Loading parameters from h5 store ...")
-	    with h5.File(embeddings_path, 'r') as store:
-		with self.graph.as_default():
-		    with self.sess.as_default():
-			for var_name in self.trainModel.parameter_lists:
-			    tensor = store[var_name].value
-			    var = self.trainModel.parameter_lists[var_name]
-			    if var_name[:3] == 'ent':
-				if self.train_subset:
-				    update_indices = []
-				    updates = np.empty((self.entTotal, self.ent_size))
-				    for n in xrange(self.entTotal):
-					global_id = self.entity2id[self.local_entities[n]]
-					update_indices.append(n)
-					updates[n] = tensor[global_id]
-				    tf.scatter_update(var, update_indices, updates).eval()
-				else:
-				    var.assign(tensor).eval()
-			    else:
-				var.assign(tensor).eval()
+		print("Loading parameters from h5 store ...")
+		with h5.File(embeddings_path, 'r') as store:
+			with self.graph.as_default():
+				with self.sess.as_default():
+					for var_name in self.trainModel.parameter_lists:
+						tensor = store[var_name].value
+						var = self.trainModel.parameter_lists[var_name]
+						if var_name[:3] == 'ent':
+							if self.train_subset:
+								update_indices = []
+								updates = np.empty((self.entTotal, self.ent_size))
+								for n in xrange(self.entTotal):
+									global_id = self.entity2id[self.local_entities[n]]
+									update_indices.append(n)
+									updates[n] = tensor[global_id]
+								tf.scatter_update(var, update_indices, updates).eval()
+							else:
+								var.assign(tensor).eval()
+						else:
+							var.assign(tensor).eval()
 
 	def train_step(self, batch_h, batch_t, batch_r, batch_y):
 		feed_dict = {
@@ -364,6 +373,7 @@ class Config(object):
 		return predict
 
 	def run(self):
+		cdef int i, nbatches
 		best_loss = None
 		stopping_step = 0
 		with self.graph.as_default():
@@ -372,7 +382,9 @@ class Config(object):
 					self.restore_tensorflow()
 				for times in range(self.train_times):
 					res = 0.0
-					for batch in range(self.nbatches):
+					i = 0
+					nbatches = self.nbatches
+					for batch in range(nbatches):
 						self.sampling()
 						res += self.train_step(self.batch_h, self.batch_t, self.batch_r, self.batch_y)
 					if self.log_on:
@@ -428,19 +440,19 @@ class Config(object):
 
 	def predict(self, h, t, r, n=10):
 		if h is None:
-		    for i in xrange(self.entTotal):
-			self.test_h[i] = i
+			for i in xrange(self.entTotal):
+				self.test_h[i] = i
 		else:
-		    self.test_h[:] = h
+			self.test_h[:] = h
 		if t is None:
-		    for i in xrange(self.entTotal):
-			self.test_t[i] = i
+			for i in xrange(self.entTotal):
+				self.test_t[i] = i
 		else:
-		    self.test_t[:] = t
+			self.test_t[:] = t
 		self.test_r[:] = r
 		scores = self.test_step(self.test_h, self.test_t, self.test_r)
 		top_n = np.argpartition(scores, n)[:n]
 		sorted_top_n = top_n[scores[top_n].argsort()]
 		top_n_score = scores[sorted_top_n]
 		for i in range(sorted_top_n.shape[0]):
-		    print sorted_top_n[i], top_n_score[i]
+			print sorted_top_n[i], top_n_score[i]
