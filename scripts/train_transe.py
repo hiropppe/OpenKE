@@ -4,19 +4,18 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/../')
 
 import config
 import models
+import multiprocessing
 
 
 def train(args):
-    # Input training files from benchmarks/FB15K/ folder.
     con = config.Config()
-    # True: Input test files from the same folder.
     con.set_in_path(args.in_path)
 
-    con.set_test_link_prediction(False)
-    con.set_test_triple_classification(False)
-    con.set_work_threads(10)
-    con.set_train_times(10000)
-    con.set_nbatches(20)
+    con.set_test_link_prediction(args.test_link_prediction)
+    con.set_test_triple_classification(args.test_triple_classification)
+    con.set_work_threads(args.threads)
+    con.set_train_times(args.epochs)
+    con.set_nbatches(args.batches)
     con.set_alpha(0.01)
     con.set_margin(1.0)
     con.set_bern(0)
@@ -26,18 +25,14 @@ def train(args):
     con.set_opt_method("Adagrad")
     con.set_early_stopping_rounds(50)
 
-    # Models will be exported via tf.Saver() automatically.
     con.set_export_files(os.path.join(args.out_path, "model.vec.tf"), 0)
-    # Model parameters will be exported to json files automatically.
-    con.set_out_files(os.path.join(args.out_path, "./res/embedding.vec.json"))
-    # Initialize experimental settings.
+    con.set_out_files(os.path.join(args.out_path, "embedding.vec.json"))
     con.init()
-    # Set the knowledge embedding model
     con.set_model(models.TransE)
-    # Train the model.
     con.run()
-    # To test models after training needs "set_test_flag(True)".
-    con.test()
+
+    if args.test_link_prediction or args.test_triple_classification:
+        con.test()
 
 
 def main(cmd_line_args=None):
@@ -49,6 +44,21 @@ def main(cmd_line_args=None):
     parser.add_argument(
         '--out_path', '-o', type=str, default='./res/', required=True,
         help='Path to directory where export model and parameters.')
+    parser.add_argument(
+        '--epochs', '-e', type=int, default=1000, required=False,
+        help='Max epoch size.')
+    parser.add_argument(
+        '--batches', '-b', type=int, default=1000, required=False,
+        help='Number of batches in each epoch.')
+    parser.add_argument(
+        '--threads', '-t', type=int, default=multiprocessing.cpu_count(), required=False,
+        help='Thread size for sampling input batch.')
+    parser.add_argument(
+        '--test_link_prediction', '-tl', default=False, action='store_true', required=False,
+        help='Test link prediction.')
+    parser.add_argument(
+        '--test_triple_classification', '-tc', default=False, action='store_true', required=False,
+        help='Test triple classification.')
 
     if cmd_line_args is None:
         args = parser.parse_args()
