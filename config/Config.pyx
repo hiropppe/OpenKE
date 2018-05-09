@@ -1,6 +1,5 @@
 #coding:utf-8
 # cython: boundscheck = False
-# cython: wraparound = False
 # cython: cdivision = True
 
 import numpy as np
@@ -11,6 +10,7 @@ import datetime
 import ctypes
 import json
 import h5py as h5
+import time
 
 cimport numpy as np
 
@@ -382,14 +382,13 @@ class Config(object):
 					self.restore_tensorflow()
 				for times in range(self.train_times):
 					res = 0.0
-					i = 0
 					nbatches = self.nbatches
-					for batch in range(nbatches):
+					start = time.time()
+					for i in range(nbatches):
 						self.sampling()
 						res += self.train_step(self.batch_h, self.batch_t, self.batch_r, self.batch_y)
 					if self.log_on:
-						print times
-						print res
+						print("Epoch {:d}: Loss: {:.3f} Elapsed: {:.3f} sec".format(times, res/nbatches, time.time() - start))
 					if self.exportName != None and (self.export_steps!=0 and times % self.export_steps == 0):
 						self.save_tensorflow()
 					if self.early_stopping_rounds:
