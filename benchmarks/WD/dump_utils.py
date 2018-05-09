@@ -12,18 +12,23 @@ relation_set = None
 
 class WikidataDumpReader(object):
 
-    def __init__(self, dump_path, n_items):
+    def __init__(self, dump_path, n_items, filtered=False):
         self.dump_path = dump_path
         self.n_items = n_items
+        self.filtered = filtered
 
     def __iter__(self):
         with smart_open(self.dump_path) as f:
-            f.next()
+            if not self.filtered:
+                f.next()
             pbar = tqdm(total=self.n_items)
             for i, line in enumerate(f):
                 if i < self.n_items:
                     try:
-                        yield json.loads(line[:-2])
+                        if self.filtered:
+                            yield json.loads(line)
+                        else:
+                            yield json.loads(line[:-2])
                     except ValueError:
                         pass
                 else:
@@ -34,7 +39,7 @@ class WikidataDumpReader(object):
 
 def entity2id_func(args):
     seq = 0
-    for data in WikidataDumpReader(args.dump, args.items):
+    for data in WikidataDumpReader(args.dump, args.items, args.filtered):
         if data['type'] != 'item':
             continue
 
@@ -45,7 +50,7 @@ def entity2id_func(args):
 def relation2id_func(args):
     relation_set = set()
     seq = 0
-    for data in WikidataDumpReader(args.dump, args.items):
+    for data in WikidataDumpReader(args.dump, args.items, args.filtered):
         if data['type'] != 'item':
             continue
 
@@ -75,7 +80,7 @@ def triple2id_func(args):
             r, n = l.split()
             relation2id[r] = int(n)
 
-    for data in WikidataDumpReader(args.dump, args.items):
+    for data in WikidataDumpReader(args.dump, args.items, args.filtered):
         if data['type'] != 'item':
             continue
 
@@ -139,6 +144,9 @@ def main(cmd_line_args=None):
     parser.add_argument(
         '--items', '-n', type=int, default=44488327, required=True,
         help='Number of items to process.')
+    parser.add_argument(
+        '--filtered', '-f', default=False, action='store_true', required=False,
+        help='Set if use filtered dump file.')
 
     subparsers = parser.add_subparsers(help='sub-command help')
     entity = subparsers.add_parser('entity2id', help='Output entity2id.')
