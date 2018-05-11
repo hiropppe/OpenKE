@@ -135,3 +135,5 @@ venv.bak/
 
 # data
 ./benchmarks/WD/*.txt
+
+/docker/cudnn*
