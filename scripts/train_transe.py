@@ -26,6 +26,7 @@ def train(args):
     con.set_early_stopping_rounds(50)
 
     con.set_export_files(os.path.join(args.out_path, "model.vec.tf"), 0)
+    con.set_export_steps(10)
     con.set_out_files(os.path.join(args.out_path, "embedding.vec.json"))
     con.init()
     con.set_model(models.TransE)
@@ -59,6 +60,9 @@ def main(cmd_line_args=None):
     parser.add_argument(
         '--test_triple_classification', '-tc', default=False, action='store_true', required=False,
         help='Test triple classification.')
+    parser.add_argument(
+        '--export_steps', type=int, default=100, required=False,
+        help='Save model and parameter at specified step interval.')
 
     if cmd_line_args is None:
         args = parser.parse_args()
