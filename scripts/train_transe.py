@@ -8,7 +8,13 @@ import multiprocessing
 
 
 def train(args):
-    con = config.Config()
+    if args.num_gpus > 1:
+        if args.sync_grads:
+            con = config.MultiGPUConfig()
+        else:
+            con = config.AsyncMultiGPUConfig()
+    else:
+        con = config.Config()
     con.set_in_path(args.in_path)
 
     con.set_test_link_prediction(args.test_link_prediction)
@@ -26,7 +32,7 @@ def train(args):
     con.set_early_stopping_rounds(50)
 
     con.set_export_files(os.path.join(args.out_path, "model.vec.tf"), 0)
-    con.set_export_steps(10)
+    con.set_export_steps(100)
     con.set_out_files(os.path.join(args.out_path, "embedding.vec.json"))
     con.init()
     con.set_model(models.TransE)
@@ -52,7 +58,7 @@ def main(cmd_line_args=None):
         '--batches', '-b', type=int, default=1000, required=False,
         help='Number of batches in each epoch.')
     parser.add_argument(
-        '--threads', '-t', type=int, default=multiprocessing.cpu_count(), required=False,
+        '--threads', '-t', type=int, default=max(multiprocessing.cpu_count()/2, 1), required=False,
         help='Thread size for sampling input batch.')
     parser.add_argument(
         '--test_link_prediction', '-tl', default=False, action='store_true', required=False,
@@ -63,6 +69,12 @@ def main(cmd_line_args=None):
     parser.add_argument(
         '--export_steps', type=int, default=100, required=False,
         help='Save model and parameter at specified step interval.')
+    parser.add_argument(
+        '--num_gpus', type=int, default=1, required=False,
+        help='')
+    parser.add_argument(
+        '--sync_grads', default=False, action="store_true", required=False,
+        help='')
 
     if cmd_line_args is None:
         args = parser.parse_args()
