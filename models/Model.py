@@ -66,18 +66,18 @@ class Model(object):
 	def predict_def(self):
 		pass
 
-	def __init__(self, config):
+	def __init__(self, config, init_op=True):
 		self.config = config
 
-		with tf.name_scope("input"):
-			self.input_def()
+		if init_op:
+			with tf.name_scope("input"):
+				self.input_def()
 
-		with tf.name_scope("embedding"):
-			self.embedding_def()
+			with tf.name_scope("embedding"):
+				self.embedding_def()
 
-		with tf.name_scope("loss"):
-			self.loss_def()
+			with tf.name_scope("loss"):
+				self.loss_def()
 
-		with tf.name_scope("predict"):
-			self.predict_def()
-
+			with tf.name_scope("predict"):
+				self.predict_def()
