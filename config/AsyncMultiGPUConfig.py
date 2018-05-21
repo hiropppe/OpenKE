@@ -51,8 +51,8 @@ class AsyncMultiGPUConfig(object):
 		self.test_triple_classification = False
 		self.early_stopping_rounds = None
 		self.train_subset = None
-		self.num_gpus = 2
-		self.num_train_threads = 2
+		self.num_gpus = 1
+		self.num_train_threads = 1
 	def init(self):
 		self.trainModel = None
 		if self.in_path != None:
@@ -82,14 +82,6 @@ class AsyncMultiGPUConfig(object):
 			self.validTotal = self.lib.getValidTotal()
 			self.batch_size = self.lib.getTrainTotal() / self.nbatches
 			self.batch_seq_size = self.batch_size * (1 + self.negative_ent + self.negative_rel)
-			self.batch_h = np.zeros(self.batch_size * (1 + self.negative_ent + self.negative_rel), dtype = np.int64)
-			self.batch_t = np.zeros(self.batch_size * (1 + self.negative_ent + self.negative_rel), dtype = np.int64)
-			self.batch_r = np.zeros(self.batch_size * (1 + self.negative_ent + self.negative_rel), dtype = np.int64)
-			self.batch_y = np.zeros(self.batch_size * (1 + self.negative_ent + self.negative_rel), dtype = np.float32)
-			self.batch_h_addr = self.batch_h.__array_interface__['data'][0]
-			self.batch_t_addr = self.batch_t.__array_interface__['data'][0]
-			self.batch_r_addr = self.batch_r.__array_interface__['data'][0]
-			self.batch_y_addr = self.batch_y.__array_interface__['data'][0]
 		if self.test_link_prediction:
 			self.lib.importTestFiles()
 			self.test_h = np.zeros(self.lib.getEntityTotal(), dtype = np.int64)
@@ -207,10 +199,16 @@ class AsyncMultiGPUConfig(object):
 		self.early_stopping_rounds = rounds
 
 	def set_train_subset(self, subset):
-		self.train_subset = subset;
+		self.train_subset = subset
 
-	def sampling(self):
-		self.lib.sampling(self.batch_h_addr, self.batch_t_addr, self.batch_r_addr, self.batch_y_addr, self.batch_size, self.negative_ent, self.negative_rel)
+	def set_num_gpus(self, gpus):
+		self.num_gpus = gpus
+
+	def set_num_train_threads(self, threads):
+		self.num_train_threads = threads
+
+	def sampling(self, batch_h_addr, batch_t_addr, batch_r_addr, batch_y_addr):
+		self.lib.sampling(batch_h_addr, batch_t_addr, batch_r_addr, batch_y_addr, self.batch_size, self.negative_ent, self.negative_rel)
 
 	def save_tensorflow(self):
 		with self.graph.as_default():
@@ -388,38 +386,64 @@ class AsyncMultiGPUConfig(object):
 		return predict
 
 	def train(self, train_op, loss_op, summary_writer, summary_op, global_step, epoch, is_chief=False):
+		batch_h = np.zeros(self.batch_size * (1 + self.negative_ent + self.negative_rel), dtype = np.int64)
+		batch_t = np.zeros(self.batch_size * (1 + self.negative_ent + self.negative_rel), dtype = np.int64)
+		batch_r = np.zeros(self.batch_size * (1 + self.negative_ent + self.negative_rel), dtype = np.int64)
+		batch_y = np.zeros(self.batch_size * (1 + self.negative_ent + self.negative_rel), dtype = np.float32)
+		batch_h_addr = batch_h.__array_interface__['data'][0]
+		batch_t_addr = batch_t.__array_interface__['data'][0]
+		batch_r_addr = batch_r.__array_interface__['data'][0]
+		batch_y_addr = batch_y.__array_interface__['data'][0]
 		reports = 0
 		cum_loss = 0.0
+		ob = 0
+		ob_threshold = 100000.0
 		nbatches = self.nbatches
 		start = time.time()
 		for local_step in range(nbatches):
-	   		self.sampling()
+	   		self.sampling(batch_h_addr, batch_t_addr, batch_r_addr, batch_y_addr)
 			feed_dict = {
-				self.trainModel.batch_h: self.batch_h,
-				self.trainModel.batch_t: self.batch_t,
-				self.trainModel.batch_r: self.batch_r,
-				self.trainModel.batch_y: self.batch_y
+				self.trainModel.batch_h: batch_h,
+				self.trainModel.batch_t: batch_t,
+				self.trainModel.batch_r: batch_r,
+				self.trainModel.batch_y: batch_y
 			}
 			loss, step = self.train_step(train_op, loss_op, global_step, feed_dict)
-			cum_loss += loss
+			# TODO sometimes return OB loss ...
+			if loss < ob_threshold:
+				cum_loss += loss
+				if is_chief:
+					if self.exportName != None and local_step >= self.export_steps * (reports+1):
+						reports += 1
+						summary = self.sess.run(summary_op, feed_dict)
+						self.summary_writer.add_summary(summary, global_step=step)
+						self.summary_writer.flush()
+			else:
+			    ob += 1
 
-			if is_chief:
-				if self.exportName != None and local_step >= self.export_steps * (reports+1):
-					reports += 1
-					summary = self.sess.run(summary_op, feed_dict)
-					self.summary_writer.add_summary(summary, global_step=step)
-					self.summary_writer.flush()
-
-                mean_loss = cum_loss/float(self.nbatches)
-
+		mean_loss = cum_loss/float(self.nbatches - ob)
 		if is_chief and self.log_on:
-			print("Epoch. {:d}, Step: {:d}, Loss: {:.3f} Elapsed: {:.3f} sec".format(epoch, step, mean_loss, time.time() - start))
+                        print("Epoch. {:d}, Step: {:d}, Loss: {:.3f}, OB Loss: {:d}, Elapsed: {:.3f} sec, Total Elapsed: {:.3f} sec"
+                                .format(epoch, step, mean_loss, ob, time.time() - start, time.time() - self.train_start))
 
 		return mean_loss
 
 	def run(self):
+                print('Starting train.')
+                print('  max epoch: {:d}'.format(self.train_times))
+                print('  epoch length: {:d}'.format(self.nbatches))
+                print('  batch size: {:d}'.format(self.batch_size))
+                print('  GPUs: {:d}'.format(self.num_gpus))
+                print('  train threads: {:d}'.format(self.num_train_threads))
+                print('  sampling threads: {:d}'.format(self.workThreads))
+                print('  total entity: {:d}'.format(self.entTotal))
+                print('  total relation: {:d}'.format(self.relTotal))
+                print('  total train triple: {:d}'.format(self.trainTotal))
+                print('  total test triple: {:d}'.format(self.testTotal))
+                print('  total valid triple: {:d}'.format(self.validTotal))
 		best_loss = None
 		stopping_step = 0
+                self.train_start = time.time()
 		with self.graph.as_default():
 			with self.sess.as_default():
 				if self.importName != None:
@@ -450,7 +474,7 @@ class AsyncMultiGPUConfig(object):
 
 						loss = cum_loss / float(self.num_train_threads)
 
-                                        if self.exportName != None:
+					if self.exportName != None:
 						self.save_tensorflow()
 
 					if self.early_stopping_rounds:
@@ -521,15 +545,15 @@ class AsyncMultiGPUConfig(object):
 
 class ThreadWithReturnValue(Thread):
     def __init__(self, group=None, target=None, name=None,
-                 args=(), kwargs={}, Verbose=None):
-        Thread.__init__(self, group, target, name, args, kwargs, Verbose)
-        self._return = None
+		 args=(), kwargs={}, Verbose=None):
+	Thread.__init__(self, group, target, name, args, kwargs, Verbose)
+	self._return = None
     def run(self):
-        if self._Thread__target is not None:
-            self._return = self._Thread__target(*self._Thread__args,
-                                                **self._Thread__kwargs)
+	if self._Thread__target is not None:
+	    self._return = self._Thread__target(*self._Thread__args,
+						**self._Thread__kwargs)
     def join(self):
-        Thread.join(self)
-        return self._return
+	Thread.join(self)
+	return self._return
 
 

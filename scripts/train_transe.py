@@ -8,13 +8,16 @@ import multiprocessing
 
 
 def train(args):
-    if args.num_gpus > 1:
-        if args.sync_grads:
-            con = config.MultiGPUConfig()
-        else:
-            con = config.AsyncMultiGPUConfig()
+    if args.grad_operation == 'sync':
+        con = config.MultiGPUConfig()
+        con.set_num_gpus(args.num_gpus)
+    elif args.grad_operation == 'async':
+        con = config.AsyncMultiGPUConfig()
+        con.set_num_gpus(args.num_gpus)
+        con.set_num_train_threads(args.num_train_threads)
     else:
         con = config.Config()
+
     con.set_in_path(args.in_path)
 
     con.set_test_link_prediction(args.test_link_prediction)
@@ -31,8 +34,9 @@ def train(args):
     con.set_opt_method("Adagrad")
     con.set_early_stopping_rounds(50)
 
-    con.set_export_files(os.path.join(args.out_path, "model.vec.tf"), 0)
-    con.set_export_steps(100)
+    if args.import_path:
+        con.set_import_files(args.import_path)
+    con.set_export_files(args.export_path, args.export_steps)
     con.set_out_files(os.path.join(args.out_path, "embedding.vec.json"))
     con.init()
     con.set_model(models.TransE)
@@ -67,13 +71,22 @@ def main(cmd_line_args=None):
         '--test_triple_classification', '-tc', default=False, action='store_true', required=False,
         help='Test triple classification.')
     parser.add_argument(
-        '--export_steps', type=int, default=100, required=False,
+        '--export_steps', type=int, default=10, required=False,
         help='Save model and parameter at specified step interval.')
     parser.add_argument(
         '--num_gpus', type=int, default=1, required=False,
         help='')
     parser.add_argument(
-        '--sync_grads', default=False, action="store_true", required=False,
+        '--num_train_threads', type=int, default=1, required=False,
+        help='')
+    parser.add_argument(
+        '--grad_operation', default=None, choices=['sync', 'async'], required=False,
+        help='')
+    parser.add_argument(
+        '--import_path', type=str, default=None, required=False,
+        help='')
+    parser.add_argument(
+        '--export_path', type=str, default='./res/model.vec.tf', required=False,
         help='')
 
     if cmd_line_args is None:

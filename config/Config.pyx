@@ -222,6 +222,7 @@ class Config(object):
 	def restore_tensorflow(self):
 		with self.graph.as_default():
 			with self.sess.as_default():
+				print('restore.')
 				self.saver.restore(self.sess, self.importName)
 
 
@@ -323,6 +324,11 @@ class Config(object):
 					grads_and_vars = self.optimizer.compute_gradients(self.trainModel.loss)
 					self.train_op = self.optimizer.apply_gradients(grads_and_vars)
 				self.saver = tf.train.Saver()
+
+				tf.summary.scalar('loss', self.trainModel.loss)
+				self.summary_op = tf.summary.merge_all()
+				self.summary_writer = tf.summary.FileWriter(self.out_path[:self.out_path.rindex('/')], graph=self.sess.graph)
+
 				self.sess.run(tf.initialize_all_variables())
 
 	def load_parameters(self, embeddings_path=None):
