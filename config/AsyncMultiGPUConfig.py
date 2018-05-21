@@ -53,6 +53,7 @@ class AsyncMultiGPUConfig(object):
 		self.train_subset = None
 		self.num_gpus = 1
 		self.num_train_threads = 1
+		self.per_process_gpu_memory_fraction = None
 	def init(self):
 		self.trainModel = None
 		if self.in_path != None:
@@ -207,6 +208,9 @@ class AsyncMultiGPUConfig(object):
 	def set_num_train_threads(self, threads):
 		self.num_train_threads = threads
 
+	def set_per_process_gpu_memory_fraction(self, fraction):
+		self.per_process_gpu_memory_fraction = fraction
+
 	def sampling(self, batch_h_addr, batch_t_addr, batch_r_addr, batch_y_addr):
 		self.lib.sampling(batch_h_addr, batch_t_addr, batch_r_addr, batch_y_addr, self.batch_size, self.negative_ent, self.negative_rel)
 
@@ -304,6 +308,8 @@ class AsyncMultiGPUConfig(object):
 			self.global_step = tf.contrib.framework.get_or_create_global_step()
 			config = tf.ConfigProto(allow_soft_placement=True,
 						log_device_placement=False)
+			if self.per_process_gpu_memory_fraction:
+				config.gpu_options.per_process_gpu_memory_fraction = self.per_process_gpu_memory_fraction
 			self.sess = tf.Session(config=config)
 			with self.sess.as_default():
 				self.gpu_ops = []
@@ -423,27 +429,27 @@ class AsyncMultiGPUConfig(object):
 
 		mean_loss = cum_loss/float(self.nbatches - ob)
 		if is_chief and self.log_on:
-                        print("Epoch. {:d}, Step: {:d}, Loss: {:.3f}, OB Loss: {:d}, Elapsed: {:.3f} sec, Total Elapsed: {:.3f} sec"
-                                .format(epoch, step, mean_loss, ob, time.time() - start, time.time() - self.train_start))
+			print("Epoch. {:d}, Step: {:d}, Loss: {:.3f}, OB Loss: {:d}, Elapsed: {:.3f} sec, Total Elapsed: {:.3f} sec"
+				.format(epoch, step, mean_loss, ob, time.time() - start, time.time() - self.train_start))
 
 		return mean_loss
 
 	def run(self):
-                print('Starting train.')
-                print('  max epoch: {:d}'.format(self.train_times))
-                print('  epoch length: {:d}'.format(self.nbatches))
-                print('  batch size: {:d}'.format(self.batch_size))
-                print('  GPUs: {:d}'.format(self.num_gpus))
-                print('  train threads: {:d}'.format(self.num_train_threads))
-                print('  sampling threads: {:d}'.format(self.workThreads))
-                print('  total entity: {:d}'.format(self.entTotal))
-                print('  total relation: {:d}'.format(self.relTotal))
-                print('  total train triple: {:d}'.format(self.trainTotal))
-                print('  total test triple: {:d}'.format(self.testTotal))
-                print('  total valid triple: {:d}'.format(self.validTotal))
+		print('Starting train.')
+		print('  max epoch: {:d}'.format(self.train_times))
+		print('  epoch length: {:d}'.format(self.nbatches))
+		print('  batch size: {:d}'.format(self.batch_size))
+		print('  GPUs: {:d}'.format(self.num_gpus))
+		print('  train threads: {:d}'.format(self.num_train_threads))
+		print('  sampling threads: {:d}'.format(self.workThreads))
+		print('  total entity: {:d}'.format(self.entTotal))
+		print('  total relation: {:d}'.format(self.relTotal))
+		print('  total train triple: {:d}'.format(self.trainTotal))
+		print('  total test triple: {:d}'.format(self.testTotal))
+		print('  total valid triple: {:d}'.format(self.validTotal))
 		best_loss = None
 		stopping_step = 0
-                self.train_start = time.time()
+		self.train_start = time.time()
 		with self.graph.as_default():
 			with self.sess.as_default():
 				if self.importName != None:
