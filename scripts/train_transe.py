@@ -33,6 +33,7 @@ def train(args):
     con.set_rel_neg_rate(0)
     con.set_opt_method("Adagrad")
     con.set_early_stopping_rounds(50)
+    con.set_per_process_gpu_memory_fraction(args.per_process_gpu_memory_fraction)
 
     if args.import_path:
         con.set_import_files(args.import_path)
@@ -75,6 +76,9 @@ def main(cmd_line_args=None):
         help='Save model and parameter at specified step interval.')
     parser.add_argument(
         '--num_gpus', type=int, default=1, required=False,
+        help='')
+    parser.add_argument(
+        '--per_process_gpu_memory_fraction', type=float, default=None, required=False,
         help='')
     parser.add_argument(
         '--num_train_threads', type=int, default=1, required=False,
