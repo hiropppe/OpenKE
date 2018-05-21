@@ -116,7 +116,7 @@ class MultiGPUConfig(object):
 		self.test_triple_classification = False
 		self.early_stopping_rounds = None
 		self.train_subset = None
-		self.num_gpus = 2
+		self.num_gpus = 1
 	def init(self):
 		self.trainModel = None
 		if self.in_path != None:
@@ -272,6 +272,9 @@ class MultiGPUConfig(object):
 
 	def set_train_subset(self, subset):
 		self.train_subset = subset;
+
+	def set_num_gpus(self, gpus):
+		self.num_gpus = gpus
 
 	def sampling(self):
 		self.lib.sampling(self.batch_h_addr, self.batch_t_addr, self.batch_r_addr, self.batch_y_addr, self.batch_size, self.negative_ent, self.negative_rel)
