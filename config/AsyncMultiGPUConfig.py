@@ -429,7 +429,7 @@ class AsyncMultiGPUConfig(object):
 
 		mean_loss = cum_loss/float(self.nbatches - ob)
 		if is_chief and self.log_on:
-			print("Epoch. {:d}, Step: {:d}, Loss: {:.3f}, OB Loss: {:d}, Elapsed: {:.3f} sec, Total Elapsed: {:.3f} sec"
+			print("Epoch. {:d}, Step: {:d}, Loss: {:.5f}, OB Loss: {:d}, Elapsed: {:.3f} sec, Total Elapsed: {:.3f} sec"
 				.format(epoch, step, mean_loss, ob, time.time() - start, time.time() - self.train_start))
 
 		return mean_loss

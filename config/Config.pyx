@@ -55,6 +55,7 @@ class Config(object):
 		self.test_triple_classification = False
 		self.early_stopping_rounds = None
 		self.train_subset = None
+		self.per_process_gpu_memory_fraction = None
 	def init(self):
 		self.trainModel = None
 		if self.in_path != None:
@@ -211,6 +212,9 @@ class Config(object):
 	def set_train_subset(self, subset):
 		self.train_subset = subset;
 
+	def set_per_process_gpu_memory_fraction(self, fraction):
+		self.per_process_gpu_memory_fraction = fraction
+
 	def sampling(self):
 		self.lib.sampling(self.batch_h_addr, self.batch_t_addr, self.batch_r_addr, self.batch_y_addr, self.batch_size, self.negative_ent, self.negative_rel)
 
@@ -306,6 +310,10 @@ class Config(object):
 		self.model = model
 		self.graph = tf.Graph()
 		with self.graph.as_default():
+			config = tf.ConfigProto(allow_soft_placement=True,
+						log_device_placement=False)
+			if self.per_process_gpu_memory_fraction:
+				config.gpu_options.per_process_gpu_memory_fraction = self.per_process_gpu_memory_fraction
 			self.sess = tf.Session()
 			with self.sess.as_default():
 				initializer = tf.contrib.layers.xavier_initializer(uniform = True)
@@ -394,7 +402,7 @@ class Config(object):
 						self.sampling()
 						res += self.train_step(self.batch_h, self.batch_t, self.batch_r, self.batch_y)
 					if self.log_on:
-						print("Epoch {:d}: Loss: {:.3f} Elapsed: {:.3f} sec".format(times, res/nbatches, time.time() - start))
+						print("Epoch {:d}: Loss: {:.5f} Elapsed: {:.3f} sec".format(times, res/nbatches, time.time() - start))
 					if self.exportName != None and (self.export_steps!=0 and times % self.export_steps == 0):
 						self.save_tensorflow()
 					if self.early_stopping_rounds:
