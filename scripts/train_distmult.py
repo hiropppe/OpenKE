@@ -25,13 +25,12 @@ def train(args):
     con.set_work_threads(args.threads)
     con.set_train_times(args.epochs)
     con.set_nbatches(args.batches)
-    con.set_alpha(0.1)
-    con.set_lmbda(0.001)
+    con.set_alpha(args.learning_rate)
     con.set_bern(0)
-    con.set_dimension(100)
-    con.set_ent_neg_rate(6)
-    con.set_rel_neg_rate(0)
-    con.set_opt_method("Adagrad")
+    con.set_dimension(args.dimention)
+    con.set_ent_neg_rate(args.ent_neg_rate)
+    con.set_rel_neg_rate(args.rel_neg_rate)
+    con.set_opt_method("Adam")
     con.set_early_stopping_rounds(50)
     con.set_per_process_gpu_memory_fraction(args.per_process_gpu_memory_fraction)
 
@@ -40,7 +39,7 @@ def train(args):
     con.set_export_files(args.export_path, args.export_steps)
     con.set_out_files(os.path.join(args.out_path, "embedding.vec.json"))
     con.init()
-    con.set_model(models.Analogy)
+    con.set_model(models.DistMult)
     con.run()
 
     if args.test_link_prediction or args.test_triple_classification:
@@ -57,10 +56,22 @@ def main(cmd_line_args=None):
         '--out_path', '-o', type=str, default='./res/', required=True,
         help='Path to directory where export model and parameters.')
     parser.add_argument(
-        '--epochs', '-e', type=int, default=1000, required=False,
+        '--learning_rate', '-lr', type=float, default=0.001, required=False,
+        help='Learning rate.')
+    parser.add_argument(
+        '--dimention', '-d', type=int, default=512, required=False,
+        help='Embedding dimention size.')
+    parser.add_argument(
+        '--ent_neg_rate', type=int, default=2, required=False,
+        help='Negative sampling entity rate.')
+    parser.add_argument(
+        '--rel_neg_rate', type=int, default=2, required=False,
+        help='Negative sampling relation rate.')
+    parser.add_argument(
+        '--epochs', '-e', type=int, default=10000, required=False,
         help='Max epoch size.')
     parser.add_argument(
-        '--batches', '-b', type=int, default=1000, required=False,
+        '--batches', '-b', type=int, default=10, required=False,
         help='Number of batches in each epoch.')
     parser.add_argument(
         '--threads', '-t', type=int, default=max(multiprocessing.cpu_count()/2, 1), required=False,
