@@ -98,7 +98,6 @@ def triple2id_func(args):
 
                     if datatype == 'wikibase-item' and snaktype == 'value':
                         e2 = mainsnak['datavalue']['value']['id']
-
                         if e1 in entity2id and e2 in entity2id and r in relation2id:
                             sys.stdout.write('{:d} {:d} {:d}\n'.format(
                                 entity2id[e1], entity2id[e2], relation2id[r]))
@@ -116,8 +115,12 @@ def poplang_func(args):
             if prop in data:
                 by_lang = data[prop]
                 for lang in by_lang.keys():
-                    if lang not in args.langs:
+                    if prop == 'sitelinks':
+                        if not any(lang == l + 'wiki' for l in args.langs):
+                            by_lang.pop(lang)
+                    elif lang not in args.langs:
                         by_lang.pop(lang)
+
                 if nolang and len(by_lang):
                     nolang = False
 
@@ -142,7 +145,7 @@ def main(cmd_line_args=None):
         '--dump', '-d', type=str, default=None, required=True,
         help='Wikidata dump file.')
     parser.add_argument(
-        '--items', '-n', type=int, default=44488327, required=True,
+        '--items', '-n', type=int, default=48248472, required=True,
         help='Number of items to process.')
     parser.add_argument(
         '--filtered', '-f', default=False, action='store_true', required=False,
