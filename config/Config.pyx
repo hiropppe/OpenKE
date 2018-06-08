@@ -291,10 +291,10 @@ class Config(object):
 								embeddings = np.zeros((len(self.entity2id), self.ent_size), dtype=np.float32)
 								store.create_dataset(var_name, data=embeddings)
 
-						params = self.get_parameters_by_name(var_name)
-						for i, param in enumerate(params):
-							global_id = self.entity2id[self.local_entities[i]]
-							store[var_name][global_id] = param
+							params = self.get_parameters_by_name(var_name)
+							for i, param in enumerate(params):
+								global_id = self.entity2id[self.local_entities[i]]
+								store[var_name][global_id] = param
 
 	def set_parameters_by_name(self, var_name, tensor):
 		with self.graph.as_default():
@@ -435,8 +435,8 @@ class Config(object):
 						self.lib.getTailBatch(self.test_h_addr, self.test_t_addr, self.test_r_addr)
 						res = self.test_step(self.test_h, self.test_t, self.test_r)
 						self.lib.testTail(res.__array_interface__['data'][0])
-						if self.log_on:
-							print times
+						#if self.log_on:
+						#	print times
 					self.lib.test_link_prediction()
 				if self.test_triple_classification:
 					self.lib.getValidBatch(self.valid_pos_h_addr, self.valid_pos_t_addr, self.valid_pos_r_addr, self.valid_neg_h_addr, self.valid_neg_t_addr, self.valid_neg_r_addr)
