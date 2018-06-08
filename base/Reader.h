@@ -46,7 +46,6 @@ void importTrainFiles() {
 		fin = fopen((inPath + trainSubset + "/train2id.txt").c_str(), "r");
 	}
 
-	fin = fopen((inPath + "train2id.txt").c_str(), "r");
 	tmp = fscanf(fin, "%ld", &trainTotal);
 	trainList = (Triple *)calloc(trainTotal, sizeof(Triple));
 	trainHead = (Triple *)calloc(trainTotal, sizeof(Triple));
