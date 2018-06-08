@@ -20,8 +20,6 @@ def train(args):
 
     con.set_in_path(args.in_path)
 
-    con.set_test_link_prediction(args.test_link_prediction)
-    con.set_test_triple_classification(args.test_triple_classification)
     con.set_work_threads(args.threads)
     con.set_train_times(args.epochs)
     con.set_nbatches(args.batches)
@@ -33,9 +31,6 @@ def train(args):
     con.set_opt_method("Adam")
     con.set_early_stopping_rounds(50)
     con.set_per_process_gpu_memory_fraction(args.per_process_gpu_memory_fraction)
-
-    if args.import_path:
-        con.set_import_files(args.import_path)
 
     con.set_export_files(args.export_path, args.export_steps)
     con.set_out_files(os.path.join(args.out_path, "embedding.vec.json"))
@@ -49,6 +44,16 @@ def train(args):
             con.run()
 
     if args.test_link_prediction or args.test_triple_classification:
+        con = config.Config()
+        con.set_train_subset(None)
+        con.set_in_path(args.in_path)
+        con.set_per_process_gpu_memory_fraction(args.per_process_gpu_memory_fraction)
+        con.set_test_link_prediction(args.test_link_prediction)
+        con.set_test_triple_classification(args.test_triple_classification)
+        con.set_dimension(args.dimention)
+        con.init()
+        con.set_model(models.DistMult)
+        con.load_parameters('./res/embedding.vec.h5')
         con.test()
 
 

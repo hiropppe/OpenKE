@@ -210,7 +210,11 @@ class Config(object):
 		self.early_stopping_rounds = rounds
 
 	def set_train_subset(self, subset):
-		self.train_subset = subset;
+		self.train_subset = subset
+		if subset:
+			self.lib.setTrainSubset(ctypes.create_string_buffer(subset, len(subset) * 2))
+		else:
+			self.lib.setTrainSubset("")
 
 	def set_per_process_gpu_memory_fraction(self, fraction):
 		self.per_process_gpu_memory_fraction = fraction
@@ -333,9 +337,10 @@ class Config(object):
 					self.train_op = self.optimizer.apply_gradients(grads_and_vars)
 				self.saver = tf.train.Saver()
 
-				tf.summary.scalar('loss', self.trainModel.loss)
-				self.summary_op = tf.summary.merge_all()
-				self.summary_writer = tf.summary.FileWriter(self.out_path[:self.out_path.rindex('/')], graph=self.sess.graph)
+				if self.out_path:
+					tf.summary.scalar('loss', self.trainModel.loss)
+					self.summary_op = tf.summary.merge_all()
+					self.summary_writer = tf.summary.FileWriter(self.out_path[:self.out_path.rindex('/')], graph=self.sess.graph)
 
 				self.sess.run(tf.initialize_all_variables())
 

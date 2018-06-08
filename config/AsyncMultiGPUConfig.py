@@ -13,6 +13,7 @@ import time
 
 from tensorflow.python.client import timeline
 from threading import Thread
+from tqdm import tqdm
 
 
 class AsyncMultiGPUConfig(object):
@@ -61,7 +62,6 @@ class AsyncMultiGPUConfig(object):
 		if self.in_path != None:
 			self.lib.setInPath(ctypes.create_string_buffer(self.in_path, len(self.in_path) * 2))
 			if self.train_subset:
-				self.lib.setTrainSubset(ctypes.create_string_buffer(self.train_subset, len(self.train_subset) * 2))
 				self.local_entities = list()
 				self.entity2id = dict()
 				with open(os.path.join(self.in_path, self.train_subset, 'entity2id.txt')) as entity2id:
@@ -203,6 +203,10 @@ class AsyncMultiGPUConfig(object):
 
 	def set_train_subset(self, subset):
 		self.train_subset = subset
+                if subset:
+                        self.lib.setTrainSubset(ctypes.create_string_buffer(subset, len(subset) * 2))
+                else:
+                        self.lib.setTrainSubset("")
 
 	def set_num_gpus(self, gpus):
 		self.num_gpus = gpus
@@ -376,7 +380,7 @@ class AsyncMultiGPUConfig(object):
 			with self.graph.as_default():
 				with self.sess.as_default():
 					for var_name in self.trainModel.parameter_lists:
-						tensor = store[var_name].value
+                                                tensor = store[var_name].value
 						var = self.trainModel.parameter_lists[var_name]
 						if var_name[:3] == 'ent':
 							if self.train_subset:
@@ -420,7 +424,11 @@ class AsyncMultiGPUConfig(object):
 		ob_threshold = 100000.0
 		nbatches = self.nbatches
 		start = time.time()
-		for local_step in range(nbatches):
+                if is_chief and self.log_on:
+                        pbar = tqdm(range(nbatches))
+                else:
+                        pbar = range(nbatches)
+		for local_step in pbar:
 	   		self.sampling(batch_h_addr, batch_t_addr, batch_r_addr, batch_y_addr)
 			feed_dict = {
 				self.trainModel.batch_h: batch_h,
@@ -462,6 +470,7 @@ class AsyncMultiGPUConfig(object):
 		print('  max epoch: {:d}'.format(self.train_times))
 		print('  epoch length: {:d}'.format(self.nbatches))
 		print('  batch size: {:d}'.format(self.batch_size))
+		print('  batch seq size: {:d}'.format(self.batch_seq_size))
 		print('  GPUs: {:d}'.format(self.num_gpus))
 		print('  train threads: {:d}'.format(self.num_train_threads))
 		print('  sampling threads: {:d}'.format(self.workThreads))
