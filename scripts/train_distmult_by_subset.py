@@ -3,6 +3,7 @@ import sys
 sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/../')
 
 import config
+import dataset_util
 import models
 import multiprocessing
 
@@ -35,9 +36,9 @@ def train(args):
     con.set_export_files(args.export_path, args.export_steps)
     con.set_out_files(os.path.join(args.out_path, "embedding.vec.json"))
 
-    for i in range(1):
-        for j in range(args.subset):
-            con.set_train_subset("train_" + str(j))
+    for i in range(args.repeats):
+        for split in dataset_util.split(args.in_path, args.split):
+            con.set_train_subset(split)
             con.init()
             con.set_model(models.DistMult)
             con.load_parameters()
@@ -67,9 +68,6 @@ def main(cmd_line_args=None):
         '--out_path', '-o', type=str, default='./res/', required=True,
         help='Path to directory where export model and parameters.')
     parser.add_argument(
-        '--subset', '-s', type=int, default=None, required=True,
-        help='Number of sub dataset.')
-    parser.add_argument(
         '--learning_rate', '-lr', type=float, default=0.001, required=False,
         help='Learning rate.')
     parser.add_argument(
@@ -81,6 +79,12 @@ def main(cmd_line_args=None):
     parser.add_argument(
         '--rel_neg_rate', type=int, default=2, required=False,
         help='Negative sampling relation rate.')
+    parser.add_argument(
+        '--split', '-s', type=int, default=None, required=True,
+        help='Number of splits.')
+    parser.add_argument(
+        '--repeats', '-r', type=int, default=10, required=False,
+        help='Number of repeats subsets.')
     parser.add_argument(
         '--epochs', '-e', type=int, default=10000, required=False,
         help='Max epoch size.')
