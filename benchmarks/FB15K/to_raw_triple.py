@@ -3,7 +3,7 @@
 import sys
 
 
-def to_raw(t, e='./entity2id.txt', r='./relation2id.txt'):
+def to_raw(t='./train2id.txt', e='./entity2id.txt', r='./relation2id.txt'):
     entity_dict, relation_dict = {}, {}
     with open(e) as f:
         f.next()
@@ -24,4 +24,4 @@ def to_raw(t, e='./entity2id.txt', r='./relation2id.txt'):
 
 
 if __name__ == '__main__':
-    to_raw(sys.argv[1])
+    to_raw()

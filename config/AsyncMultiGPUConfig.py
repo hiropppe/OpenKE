@@ -8,8 +8,10 @@ import datetime
 import ctypes
 import json
 import h5py as h5
+import sys
 import time
 
+from tensorflow.python.client import timeline
 from threading import Thread
 
 
@@ -270,9 +272,9 @@ class AsyncMultiGPUConfig(object):
 		f.close()
 
 	def save_embeddings(self):
-		print("Saving parameters to h5 store ...")
-		# .json to .h5
-		with h5.File(self.out_path[:-4] + 'h5', 'a') as store:
+                store_path = self.out_path[:-4] + 'h5'
+                print("Saving parameters to {:s}.".format(store_path))
+		with h5.File(store_path, 'a') as store:
 			with self.graph.as_default():
 				with self.sess.as_default():
 					for var_name in self.get_parameter_lists():
@@ -286,10 +288,10 @@ class AsyncMultiGPUConfig(object):
 								embeddings = np.zeros((len(self.entity2id), self.ent_size), dtype=np.float32)
 								store.create_dataset(var_name, data=embeddings)
 
-						params = self.get_parameters_by_name(var_name)
-						for i, param in enumerate(params):
-							global_id = self.entity2id[self.local_entities[i]]
-							store[var_name][global_id] = param
+						        params = self.get_parameters_by_name(var_name)
+						        for i, param in enumerate(params):
+							        global_id = self.entity2id[self.local_entities[i]]
+							        store[var_name][global_id] = param
 
 	def set_parameters_by_name(self, var_name, tensor):
 		with self.graph.as_default():
@@ -348,7 +350,19 @@ class AsyncMultiGPUConfig(object):
 				self.summary_op = tf.summary.merge_all()
 				self.summary_writer = tf.summary.FileWriter(self.out_path[:self.out_path.rindex('/')], graph=self.sess.graph)
 
+                                #run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
+                                #run_metadata = tf.RunMetadata()
+				#self.sess.run(tf.initialize_all_variables(), options=run_options, run_metadata=run_metadata)
 				self.sess.run(tf.initialize_all_variables())
+
+                                #step_stats = run_metadata.step_stats
+                                #tl = timeline.Timeline(step_stats)
+
+                                #ctf = tl.generate_chrome_trace_format(show_memory=True, show_dataflow=True)
+
+                                #with open('./timeline.json', 'w') as f:
+                                #    f.write(ctf)
+
 
 	def load_parameters(self, embeddings_path=None):
 		if embeddings_path is None:
@@ -357,7 +371,7 @@ class AsyncMultiGPUConfig(object):
 			else:
 				embeddings_path = self.out_path[:-4] + 'h5'
 
-		print("Loading parameters from h5 store ...")
+                print("Loading parameters from {:s}.".format(embeddings_path))
 		with h5.File(embeddings_path, 'r') as store:
 			with self.graph.as_default():
 				with self.sess.as_default():
@@ -427,15 +441,24 @@ class AsyncMultiGPUConfig(object):
 			else:
 			    ob += 1
 
-		mean_loss = cum_loss/float(self.nbatches - ob)
-		if is_chief and self.log_on:
-			print("Epoch. {:d}, Step: {:d}, Loss: {:.5f}, OB Loss: {:d}, Elapsed: {:.3f} sec, Total Elapsed: {:.3f} sec"
-				.format(epoch, step, mean_loss, ob, time.time() - start, time.time() - self.train_start))
+                if ob < self.nbatches:
+		        mean_loss = cum_loss/float(self.nbatches - ob)
+		        if is_chief and self.log_on:
+		                print("Epoch. {:d}, Step: {:d}, Loss: {:.5f}, OB Loss: {:d}, Elapsed: {:.3f} sec, Total Elapsed: {:.3f} sec"
+				        .format(epoch, step, mean_loss, ob, time.time() - start, time.time() - self.train_start))
+                else:
+                        # too many OB loss ...
+                        mean_loss = None
+		        print("Epoch. {:d} Failed !! Step: {:d}, OB Loss: {:d}, Elapsed: {:.3f} sec, Total Elapsed: {:.3f} sec"
+		                .format(epoch, step,  ob, time.time() - start, time.time() - self.train_start))
 
 		return mean_loss
 
 	def run(self):
-		print('Starting train.')
+                if self.train_subset:
+		    print('Training begins ({:s}).'.format(self.train_subset))
+                else:
+		    print('Training begins.')
 		print('  max epoch: {:d}'.format(self.train_times))
 		print('  epoch length: {:d}'.format(self.nbatches))
 		print('  batch size: {:d}'.format(self.batch_size))
@@ -468,7 +491,7 @@ class AsyncMultiGPUConfig(object):
 							ops = self.gpu_ops[i % self.num_gpus]
 
 							train_args = (ops[0], ops[1], self.summary_writer, self.summary_op, self.global_step, epoch, is_chief)
-							train_thread = ThreadWithReturnValue(name='train_thread_%d'.format(i), target=self.train, args=train_args)
+                                                        train_thread = ThreadWithReturnValue(name='train_thread_{:d}'.format(i), target=self.train, args=train_args)
 							train_threads.append(train_thread)
 
 						for tt in train_threads:
@@ -476,7 +499,11 @@ class AsyncMultiGPUConfig(object):
 
 						cum_loss = 0.0
 						for tt in train_threads:
-							cum_loss += tt.join()
+                                                        loss = tt.join()
+                                                        if loss is not None:
+							    cum_loss += loss
+                                                        else:
+                                                            sys.stderr.write('{:s} return None loss.\n'.format(tt.name))
 
 						loss = cum_loss / float(self.num_train_threads)
 
@@ -513,8 +540,8 @@ class AsyncMultiGPUConfig(object):
 						self.lib.getTailBatch(self.test_h_addr, self.test_t_addr, self.test_r_addr)
 						res = self.test_step(self.test_h, self.test_t, self.test_r)
 						self.lib.testTail(res.__array_interface__['data'][0])
-						if self.log_on:
-							print times
+						#if self.log_on:
+						#	print times
 					self.lib.test_link_prediction()
 				if self.test_triple_classification:
 					self.lib.getValidBatch(self.valid_pos_h_addr, self.valid_pos_t_addr, self.valid_pos_r_addr, self.valid_neg_h_addr, self.valid_neg_t_addr, self.valid_neg_r_addr)

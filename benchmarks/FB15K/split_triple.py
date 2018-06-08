@@ -1,9 +1,11 @@
 #!/usr/bin/env python
 
+import os
 import sys
+import shutil
 
 
-def split_triple(n_triples=100000):
+def split_triple(n_triples=250000):
     relation2id = dict()
     with open('./relation2id.txt', 'r') as f:
         f.next()
@@ -19,12 +21,15 @@ def split_triple(n_triples=100000):
     for i, l in enumerate(sys.stdin):
         if i % n_triples == 0:
             if i != 0:
-                with open('entity2id_{:d}.txt'.format(dataset_idx), 'w') as entity_out:
+                subset_dir = 'train_{:d}'.format(dataset_idx)
+                if not os.path.exists(subset_dir):
+                    os.makedirs(subset_dir)
+                with open(os.path.join(subset_dir, 'entity2id.txt'), 'w') as entity_out:
                     if entities:
                         entity_out.write('{:d}\n'.format(len(entities)))
                         for e in entities:
                             entity_out.write(e)
-                with open('train2id_{:d}.txt'.format(dataset_idx), 'w') as triple_out:
+                with open(os.path.join(subset_dir, 'train2id.txt'), 'w') as triple_out:
                     if triples:
                         triple_out.write('{:d}\n'.format(len(triples)))
                         for t in triples:
@@ -52,16 +57,20 @@ def split_triple(n_triples=100000):
 
         triples.append('{:d} {:d} {:d}\n'.format(head, tail, int(relation2id[triple[-1]])))
 
-    with open('entity2id_{:d}.txt'.format(dataset_idx), 'w') as entity_out:
-        if entities:
-            entity_out.write('{:d}\n'.format(len(entities)))
-            for e in entities:
-                entity_out.write(e)
-    with open('train2id_{:d}.txt'.format(dataset_idx), 'w') as triple_out:
-        if triples:
-            triple_out.write('{:d}\n'.format(len(triples)))
-            for t in triples:
-                triple_out.write(t)
+    if entities:
+        subset_dir = 'train_{:d}'.format(dataset_idx)
+        if not os.path.exists(subset_dir):
+            os.makedirs(subset_dir)
+        with open(os.path.join(subset_dir, 'entity2id.txt'), 'w') as entity_out:
+            if entities:
+                entity_out.write('{:d}\n'.format(len(entities)))
+                for e in entities:
+                    entity_out.write(e)
+        with open(os.path.join(subset_dir, 'train2id.txt'), 'w') as triple_out:
+            if triples:
+                triple_out.write('{:d}\n'.format(len(triples)))
+                for t in triples:
+                    triple_out.write(t)
 
 
 if __name__ == '__main__':
