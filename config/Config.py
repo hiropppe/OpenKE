@@ -1,7 +1,4 @@
 #coding:utf-8
-# cython: boundscheck = False
-# cython: cdivision = True
-
 import numpy as np
 import tensorflow as tf
 import os
@@ -11,11 +8,6 @@ import ctypes
 import json
 import h5py as h5
 import time
-
-cimport numpy as np
-
-from libc.stdio cimport printf
-
 
 class Config(object):
 
@@ -393,7 +385,6 @@ class Config(object):
 		return predict
 
 	def run(self):
-		cdef int i, nbatches
 		best_loss = None
 		stopping_step = 0
 		with self.graph.as_default():
