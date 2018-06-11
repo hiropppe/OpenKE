@@ -61,7 +61,7 @@ def train(args):
         con.set_model(models.DistMult)
         if args.splits:
             con.load_parameters('./res/embedding.vec.h5')
-        elif args.import_path:
+        else:
             con.set_import_files(args.export_path)
         con.test()
 
