@@ -2,6 +2,7 @@ import numpy as np
 import os
 
 from tqdm import tqdm
+tqdm.monitor_interval = 0
 
 
 def split(in_path, n_split, random=True):

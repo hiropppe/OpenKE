@@ -409,6 +409,7 @@ class Config(object):
 						else:
 							stopping_step += 1
 						if stopping_step >= self.early_stopping_rounds:
+							print('Early stopiing at epoch {:d}.'.format(times))
 							break
 				if self.exportName != None:
 					self.save_tensorflow()

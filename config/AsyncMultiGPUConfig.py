@@ -14,6 +14,7 @@ import time
 from tensorflow.python.client import timeline
 from threading import Thread
 from tqdm import tqdm
+tqdm.monitor_interval = 0
 
 
 class AsyncMultiGPUConfig(object):
@@ -530,6 +531,7 @@ class AsyncMultiGPUConfig(object):
 						else:
 							stopping_step += 1
 						if stopping_step >= self.early_stopping_rounds:
+                                                        print('Early stopiing at epoch {:d}.'.format(epoch))
 							break
 				if self.exportName != None:
 					self.save_tensorflow()

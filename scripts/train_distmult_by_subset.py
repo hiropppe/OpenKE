@@ -30,19 +30,24 @@ def train(args):
     con.set_ent_neg_rate(args.ent_neg_rate)
     con.set_rel_neg_rate(args.rel_neg_rate)
     con.set_opt_method("Adam")
-    con.set_early_stopping_rounds(50)
+    con.set_early_stopping_rounds(20)
     con.set_per_process_gpu_memory_fraction(args.per_process_gpu_memory_fraction)
 
     con.set_export_files(args.export_path, args.export_steps)
     con.set_out_files(os.path.join(args.out_path, "embedding.vec.json"))
 
-    for i in range(args.repeats):
-        for split in dataset_util.split(args.in_path, args.split):
-            con.set_train_subset(split)
-            con.init()
-            con.set_model(models.DistMult)
-            con.load_parameters()
-            con.run()
+    if args.splits and args.repeats:
+        for i in range(args.repeats):
+            for split in dataset_util.split(args.in_path, args.splits):
+                con.set_train_subset(split)
+                con.init()
+                con.set_model(models.DistMult)
+                con.load_parameters()
+                con.run()
+    else:
+        con.init()
+        con.set_model(models.DistMult)
+        con.run()
 
     if args.test_link_prediction or args.test_triple_classification:
         con = config.Config()
@@ -54,7 +59,10 @@ def train(args):
         con.set_dimension(args.dimention)
         con.init()
         con.set_model(models.DistMult)
-        con.load_parameters('./res/embedding.vec.h5')
+        if args.splits:
+            con.load_parameters('./res/embedding.vec.h5')
+        elif args.import_path:
+            con.set_import_files(args.export_path)
         con.test()
 
 
@@ -80,10 +88,10 @@ def main(cmd_line_args=None):
         '--rel_neg_rate', type=int, default=2, required=False,
         help='Negative sampling relation rate.')
     parser.add_argument(
-        '--split', '-s', type=int, default=None, required=True,
+        '--splits', '-s', type=int, default=None, required=False,
         help='Number of splits.')
     parser.add_argument(
-        '--repeats', '-r', type=int, default=10, required=False,
+        '--repeats', '-r', type=int, default=None, required=False,
         help='Number of repeats subsets.')
     parser.add_argument(
         '--epochs', '-e', type=int, default=10000, required=False,
@@ -114,9 +122,6 @@ def main(cmd_line_args=None):
         help='')
     parser.add_argument(
         '--grad_operation', default=None, choices=['sync', 'async'], required=False,
-        help='')
-    parser.add_argument(
-        '--import_path', type=str, default=None, required=False,
         help='')
     parser.add_argument(
         '--export_path', type=str, default='./res/model.vec.tf', required=False,
