@@ -44,6 +44,8 @@ RUN apt-get update && \
         gfortran \
         mlocate \
         libcupti-dev \
+        language-pack-ja-base \
+        language-pack-ja \
         && \
         apt-get clean && \
         rm -rf /var/lib/apt/lists/* && \
@@ -76,6 +78,7 @@ RUN pip --no-cache-dir install \
         jupyter \
         h5py==2.7.1 \
         smart-open==1.5.7 \
+        tqdm \
         jedi \
         flake8 \
         autopep8 \
@@ -100,19 +103,19 @@ RUN cd mecab/mecab-ipadic && \
     make install
 
 # Install Java8
-RUN add-apt-repository ppa:webupd8team/java && \
-    echo oracle-java8-installer shared/accepted-oracle-license-v1-1 select true | /usr/bin/debconf-set-selections && \
-    apt-get update && apt-get install -y oracle-java8-installer
+#RUN add-apt-repository ppa:webupd8team/java && \
+#    echo oracle-java8-installer shared/accepted-oracle-license-v1-1 select true | /usr/bin/debconf-set-selections && \
+#    apt-get update && apt-get install -y oracle-java8-installer
 
 # Install Bazel for building tensorflow
-RUN wget https://github.com/bazelbuild/bazel/releases/download/0.5.4/bazel-0.5.4-installer-linux-x86_64.sh && \
-    chmod +x bazel-0.5.4-installer-linux-x86_64.sh && \
-    ./bazel-0.5.4-installer-linux-x86_64.sh --user
+#RUN wget https://github.com/bazelbuild/bazel/releases/download/0.5.4/bazel-0.5.4-installer-linux-x86_64.sh && \
+#    chmod +x bazel-0.5.4-installer-linux-x86_64.sh && \
+#    ./bazel-0.5.4-installer-linux-x86_64.sh --user
 
 # Copy cuDNN
-COPY cudnn-9.1-linux-x64-v7.solitairetheme8 /root/_INSTALL/
+COPY cudnn-9.2-linux-x64-v7.1.solitairetheme8 /root/_INSTALL/
 
-RUN tar xzf cudnn-9.1-linux-x64-v7.solitairetheme8 && \
+RUN tar xzf cudnn-9.2-linux-x64-v7.1.solitairetheme8 && \
     cp -a cuda/include/* /usr/local/cuda/include/ && \
     cp -a cuda/lib64/* /usr/local/cuda/lib64/
 
@@ -151,8 +154,8 @@ RUN tar xzf cudnn-9.1-linux-x64-v7.solitairetheme8 && \
 #RUN pip install /tmp/tensorflow_pkg/tensorflow-1.5.0-cp27-cp27mu-linux_x86_64.whl
 RUN pip install tensorflow-gpu==v1.5.0
 
-RUN echo '# LANG' >> ~/.bash_profile \
- && echo 'export LANG=ja_JP.UTF-8' >> ~/.bash_profile
+RUN echo '# LANG' >> ~/.bashrc \
+ && echo 'export LANG=ja_JP.UTF-8' >> ~/.bashrc
 
 RUN mkdir -p /root/.vim/bundle \
  && git clone https://github.com/Shougo/neobundle.vim /root/.vim/bundle/neobundle.vim
