@@ -25,18 +25,19 @@ def train(args):
     con.set_work_threads(args.threads)
     con.set_train_times(args.epochs)
     con.set_nbatches(args.batches)
-    con.set_alpha(0.01)
+    con.set_alpha(args.learning_rate)
     con.set_margin(1.0)
     con.set_bern(0)
-    con.set_dimension(50)
-    con.set_ent_neg_rate(1)
-    con.set_rel_neg_rate(0)
+    con.set_dimension(args.dimension)
+    con.set_ent_neg_rate(args.ent_neg_rate)
+    con.set_rel_neg_rate(args.rel_neg_rate)
     con.set_opt_method("Adagrad")
-    con.set_early_stopping_rounds(50)
+    con.set_early_stopping_rounds(20)
     con.set_per_process_gpu_memory_fraction(args.per_process_gpu_memory_fraction)
 
     if args.import_path:
         con.set_import_files(args.import_path)
+
     con.set_export_files(args.export_path, args.export_steps)
     con.set_out_files(os.path.join(args.out_path, "embedding.vec.json"))
     con.init()
@@ -56,6 +57,18 @@ def main(cmd_line_args=None):
     parser.add_argument(
         '--out_path', '-o', type=str, default='./res/', required=True,
         help='Path to directory where export model and parameters.')
+    parser.add_argument(
+        '--learning_rate', '-lr', type=float, default=0.01, required=False,
+        help='Learning rate.')
+    parser.add_argument(
+        '--dimension', '-d', type=int, default=50, required=False,
+        help='Embedding dimension size.')
+    parser.add_argument(
+        '--ent_neg_rate', type=int, default=2, required=False,
+        help='Negative sampling entity rate.')
+    parser.add_argument(
+        '--rel_neg_rate', type=int, default=2, required=False,
+        help='Negative sampling relation rate.')
     parser.add_argument(
         '--epochs', '-e', type=int, default=1000, required=False,
         help='Max epoch size.')
